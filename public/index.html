@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .login-container {
+        margin-bottom: 20px;
+      }
+      .chat-container {
+        display: none;
+        flex-direction: column;
+        flex-grow: 1;
+      }
+      .messages {
+        border: 1px solid #ccc;
+        padding: 10px;
+        height: 300px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+      }
+      .message {
+        margin-bottom: 10px;
+        padding: 5px;
+        border-radius: 5px;
+      }
+      .sent {
+        background-color: #e3f2fd;
+        align-self: flex-end;
+        text-align: right;
+      }
+      .received {
+        background-color: #f1f1f1;
+      }
+      .message-form {
+        display: flex;
+      }
+      .message-input {
+        flex-grow: 1;
+        padding: 10px;
+        margin-right: 10px;
+      }
+      button {
+        padding: 10px 15px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Socket.IO Chat App</h1>
+
+      <div class="login-container">
+        <h2>Login</h2>
+        <div>
+          <label for="username">Username:</label>
+          <select id="username">
+            <option value="1">user1</option>
+            <option value="2">user2</option>
+          </select>
+        </div>
+        <button id="login-btn">Login</button>
+      </div>
+
+      <div class="chat-container" id="chat-container">
+        <h2>Chat</h2>
+        <div>
+          <label for="receiver">Send message to:</label>
+          <select id="receiver">
+            <option value="1">user1</option>
+            <option value="2">user2</option>
+          </select>
+        </div>
+        <div class="messages" id="messages"></div>
+        <form class="message-form" id="message-form">
+          <input
+            type="text"
+            id="message-input"
+            class="message-input"
+            placeholder="Type a message..."
+            required
+          />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script>
+      let socket;
+      let currentUserId;
+
+      document.getElementById('login-btn').addEventListener('click', () => {
+        currentUserId = parseInt(document.getElementById('username').value);
+        const username =
+          document.getElementById('username').options[
+            document.getElementById('username').selectedIndex
+          ].text;
+
+        // Update receiver dropdown to exclude current user
+        const receiverSelect = document.getElementById('receiver');
+        for (let i = 0; i < receiverSelect.options.length; i++) {
+          if (parseInt(receiverSelect.options[i].value) === currentUserId) {
+            receiverSelect.options[i].disabled = true;
+          } else {
+            receiverSelect.options[i].disabled = false;
+          }
+        }
+
+        // Connect to socket
+        socket = io('http://localhost:3000/chat');
+
+        socket.on('connect', () => {
+          console.log('Connected to server');
+
+          // Register user
+          socket.emit('register', currentUserId);
+
+          // Get chat history
+          const receiverId = parseInt(
+            document.getElementById('receiver').value,
+          );
+          socket.emit('getMessages', {
+            user1Id: currentUserId,
+            user2Id: receiverId,
+          });
+
+          // Show chat container
+          document.querySelector('.login-container').style.display = 'none';
+          document.querySelector('.chat-container').style.display = 'flex';
+        });
+
+        socket.on('message', (message) => {
+          displayMessage(message);
+        });
+
+        socket.on('error', (error) => {
+          console.error('Socket error:', error);
+          alert('Error: ' + error.message);
+        });
+      });
+
+      document
+        .getElementById('message-form')
+        .addEventListener('submit', (e) => {
+          e.preventDefault();
+
+          const messageInput = document.getElementById('message-input');
+          const content = messageInput.value.trim();
+          const receiverId = parseInt(
+            document.getElementById('receiver').value,
+          );
+
+          if (content) {
+            const message = {
+              senderId: currentUserId,
+              receiverId: receiverId,
+              content: content,
+            };
+
+            socket.emit('message', message);
+            messageInput.value = '';
+          }
+        });
+
+      document.getElementById('receiver').addEventListener('change', () => {
+        // Clear messages
+        document.getElementById('messages').innerHTML = '';
+
+        // Get chat history with selected user
+        const receiverId = parseInt(document.getElementById('receiver').value);
+        socket.emit('getMessages', {
+          user1Id: currentUserId,
+          user2Id: receiverId,
+        });
+      });
+
+      function displayMessage(message) {
+        const messagesContainer = document.getElementById('messages');
+        const messageElement = document.createElement('div');
+
+        messageElement.classList.add('message');
+        if (message.senderId === currentUserId) {
+          messageElement.classList.add('sent');
+          messageElement.textContent = `Me: ${message.content}`;
+        } else {
+          messageElement.classList.add('received');
+          messageElement.textContent = `User${message.senderId}: ${message.content}`;
+        }
+
+        messagesContainer.appendChild(messageElement);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    </script>
+  </body>
+</html>
