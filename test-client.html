@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.IO Chat Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #messages {
+        height: 300px;
+        border: 1px solid #ccc;
+        margin-bottom: 20px;
+        padding: 10px;
+        overflow-y: auto;
+      }
+      #message-form {
+        display: flex;
+      }
+      #message-input {
+        flex-grow: 1;
+        padding: 8px;
+        margin-right: 10px;
+      }
+      button {
+        padding: 8px 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .status {
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 4px;
+      }
+      .connected {
+        background-color: #dff0d8;
+        color: #3c763d;
+      }
+      .disconnected {
+        background-color: #f2dede;
+        color: #a94442;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Socket.IO Chat Test</h1>
+    <div id="connection-status" class="status disconnected">Disconnected</div>
+    <div id="messages"></div>
+    <form id="message-form">
+      <input type="text" id="message-input" placeholder="Type a message..." />
+      <button type="submit">Send</button>
+    </form>
+
+    <script>
+      // Connection status element
+      const connectionStatus = document.getElementById('connection-status');
+      const messagesDiv = document.getElementById('messages');
+      const messageForm = document.getElementById('message-form');
+      const messageInput = document.getElementById('message-input');
+
+      // Function to add message to the messages div
+      function addMessage(message, isSent = false) {
+        const messageElement = document.createElement('div');
+        messageElement.textContent = isSent
+          ? `You: ${message}`
+          : `Server: ${message}`;
+        messageElement.style.marginBottom = '8px';
+        messageElement.style.padding = '8px';
+        messageElement.style.backgroundColor = isSent ? '#e6f7ff' : '#f5f5f5';
+        messageElement.style.borderRadius = '4px';
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // Connect to Socket.IO server
+      const socket = io('http://localhost:3000', {
+        transports: ['websocket', 'polling'],
+      });
+
+      // Connection events
+      socket.on('connect', () => {
+        connectionStatus.textContent = 'Connected';
+        connectionStatus.classList.remove('disconnected');
+        connectionStatus.classList.add('connected');
+        addMessage('Connected to server');
+      });
+
+      socket.on('disconnect', () => {
+        connectionStatus.textContent = 'Disconnected';
+        connectionStatus.classList.remove('connected');
+        connectionStatus.classList.add('disconnected');
+        addMessage('Disconnected from server');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        connectionStatus.textContent = `Connection error: ${error.message}`;
+        connectionStatus.classList.remove('connected');
+        connectionStatus.classList.add('disconnected');
+        addMessage(`Connection error: ${error.message}`);
+      });
+
+      // Listen for 'message' events from the server
+      socket.on('message', (data) => {
+        addMessage(data);
+      });
+
+      // Send message on form submit
+      messageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const message = messageInput.value.trim();
+        if (message) {
+          socket.emit('message', message);
+          addMessage(message, true);
+          messageInput.value = '';
+        }
+      });
+    </script>
+  </body>
+</html>
